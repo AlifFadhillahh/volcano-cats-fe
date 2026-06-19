@@ -3,14 +3,16 @@ import { useEffect, useRef } from "react";
 import { GameLogEntry } from "@/types/game";
 import clsx from "clsx";
 
-const LOG_COLORS = {
+type LogType = GameLogEntry["type"];
+
+const LOG_COLORS: Record<LogType, string> = {
   action: "text-ash-light",
   death:  "text-ember",
   system: "text-gold/80",
   win:    "text-gold",
 };
 
-const LOG_ICONS = {
+const LOG_ICONS: Record<LogType, string> = {
   action: "▸",
   death:  "💀",
   system: "⚙️",

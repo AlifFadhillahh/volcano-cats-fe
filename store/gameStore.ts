@@ -3,7 +3,7 @@ import { ClientGameState, Card, ClientPlayer } from "@/types/game";
 
 export type ConnectionStatus = "idle" | "connecting" | "connected" | "disconnected" | "error";
 
-interface Notification {
+export interface Notification {
   id: string;
   message: string;
   type: "info" | "error" | "success" | "death" | "warning";

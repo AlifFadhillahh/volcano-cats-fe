@@ -26,14 +26,26 @@ export default function RoomPage() {
   const isCreating = searchParams.get("create") === "true";
 
   const {
-    username, gameState, myHand, mySessionId, connectionStatus,
-    targetingMode, exitTargetingMode, enterTargetingMode, pendingCardId,
-    isMyTurn, getMe, showLog, toggleLog,
+    username,
+    gameState,
+    myHand,
+    mySessionId,
+    connectionStatus,
+    targetingMode,
+    exitTargetingMode,
+    enterTargetingMode,
+    pendingCardId,
+    isMyTurn,
+    getMe,
+    showLog,
+    toggleLog,
   } = useGameStore();
 
   const { connect, sendMessage } = useColyseusRoom(roomId, username);
   const [connectAttempted, setConnectAttempted] = useState(false);
-  const [pendingGangCardIds, setPendingGangCardIds] = useState<string[] | null>(null);
+  const [pendingGangCardIds, setPendingGangCardIds] = useState<string[] | null>(
+    null,
+  );
 
   // Connect on mount
   useEffect(() => {
@@ -54,56 +66,89 @@ export default function RoomPage() {
   // ============================================================
   // ACTION HANDLERS
   // ============================================================
-  const handleStartGame = useCallback(() => sendMessage("START_GAME"), [sendMessage]);
-  const handleDrawCard = useCallback(() => sendMessage("DRAW_CARD"), [sendMessage]);
+  const handleStartGame = useCallback(
+    () => sendMessage("START_GAME"),
+    [sendMessage],
+  );
+  const handleDrawCard = useCallback(
+    () => sendMessage("DRAW_CARD"),
+    [sendMessage],
+  );
 
-  const handlePlayCard = useCallback((cardId: string, needsTarget: boolean) => {
-    if (needsTarget) {
-      enterTargetingMode(cardId);
-    } else {
-      sendMessage("PLAY_CARD", { cardId });
-    }
-  }, [sendMessage, enterTargetingMode]);
+  const handlePlayCard = useCallback(
+    (cardId: string, needsTarget: boolean) => {
+      if (needsTarget) {
+        enterTargetingMode(cardId);
+      } else {
+        sendMessage("PLAY_CARD", { cardId });
+      }
+    },
+    [sendMessage, enterTargetingMode],
+  );
 
-  const handleSelectTarget = useCallback((targetId: string) => {
-    if (pendingCardId) {
-      sendMessage("PLAY_CARD", { cardId: pendingCardId, targetId });
-      exitTargetingMode();
-    }
-  }, [pendingCardId, sendMessage, exitTargetingMode]);
+  const handleSelectTarget = useCallback(
+    (targetId: string) => {
+      if (pendingCardId) {
+        sendMessage("PLAY_CARD", { cardId: pendingCardId, targetId });
+        exitTargetingMode();
+      }
+    },
+    [pendingCardId, sendMessage, exitTargetingMode],
+  );
 
-  const handlePlayGang = useCallback((cardIds: string[], needsTarget: boolean) => {
-    if (needsTarget) {
-      setPendingGangCardIds(cardIds);
-    } else {
-      sendMessage("PLAY_GANG", { cardIds });
-    }
-  }, [sendMessage]);
+  const handlePlayGang = useCallback(
+    (cardIds: string[], needsTarget: boolean) => {
+      if (needsTarget) {
+        setPendingGangCardIds(cardIds);
+      } else {
+        sendMessage("PLAY_GANG", { cardIds });
+      }
+    },
+    [sendMessage],
+  );
 
-  const handleGangTargetSelect = useCallback((targetId: string) => {
-    if (pendingGangCardIds) {
-      sendMessage("PLAY_GANG", { cardIds: pendingGangCardIds, targetId });
-      setPendingGangCardIds(null);
-    }
-  }, [pendingGangCardIds, sendMessage]);
+  const handleGangTargetSelect = useCallback(
+    (targetId: string) => {
+      if (pendingGangCardIds) {
+        sendMessage("PLAY_GANG", { cardIds: pendingGangCardIds, targetId });
+        setPendingGangCardIds(null);
+      }
+    },
+    [pendingGangCardIds, sendMessage],
+  );
 
-  const handleWaterBucket = useCallback((position: number) => {
-    sendMessage("USE_WATER_BUCKET", { insertPosition: position });
-  }, [sendMessage]);
+  const handleWaterBucket = useCallback(
+    (position: number) => {
+      sendMessage("USE_WATER_BUCKET", { insertPosition: position });
+    },
+    [sendMessage],
+  );
 
-  const handleBribeGive = useCallback((cardId: string) => {
-    sendMessage("BRIBE_GIVE_CARD", { cardId });
-  }, [sendMessage]);
+  const handleBribeGive = useCallback(
+    (cardId: string) => {
+      sendMessage("BRIBE_GIVE_CARD", { cardId });
+    },
+    [sendMessage],
+  );
 
-  const handlePeekSwap = useCallback((swap: boolean, cardId?: string) => {
-    sendMessage("PEEK_SWAP_DECISION", { swap, cardId });
-  }, [sendMessage]);
+  const handlePeekSwap = useCallback(
+    (swap: boolean, cardId?: string) => {
+      sendMessage("PEEK_SWAP_DECISION", { swap, cardId });
+    },
+    [sendMessage],
+  );
 
-  const handleFloodDiscard = useCallback((cardId: string) => {
-    sendMessage("FLOOD_DISCARD", { cardId });
-  }, [sendMessage]);
+  const handleFloodDiscard = useCallback(
+    (cardId: string) => {
+      sendMessage("FLOOD_DISCARD", { cardId });
+    },
+    [sendMessage],
+  );
 
-  const handleFreeze = useCallback(() => sendMessage("FREEZE_PLAY"), [sendMessage]);
+  const handleFreeze = useCallback(
+    () => sendMessage("FREEZE_PLAY"),
+    [sendMessage],
+  );
 
   // ============================================================
   // LOADING / CONNECTION STATES
@@ -124,7 +169,9 @@ export default function RoomPage() {
       <div className="min-h-screen bg-obsidian flex items-center justify-center px-4">
         <div className="text-center max-w-sm">
           <div className="text-6xl mb-4">📡</div>
-          <h2 className="font-display text-2xl text-ember mb-2">Gagal Terhubung</h2>
+          <h2 className="font-display text-2xl text-ember mb-2">
+            Gagal Terhubung
+          </h2>
           <p className="text-ash text-sm mb-6">
             Room tidak ditemukan, sudah penuh, atau server sedang bermasalah.
           </p>
@@ -154,7 +201,11 @@ export default function RoomPage() {
     return (
       <>
         <NotificationToasts />
-        <Lobby gameState={gameState} roomId={roomId} onStartGame={handleStartGame} />
+        <Lobby
+          gameState={gameState}
+          roomId={roomId}
+          onStartGame={handleStartGame}
+        />
       </>
     );
   }
@@ -180,15 +231,29 @@ export default function RoomPage() {
   const hasPendingAction = !!pendingAction;
 
   // Determine which modal to show based on pending action
-  const showWaterBucketModal = pendingAction?.type === "WATER_BUCKET_PLACE" && pendingAction.initiatorId === mySessionId;
-  const showBribeModal = pendingAction?.type === "BRIBE_WAITING" && pendingAction.targetId === mySessionId;
-  const showPeekSwapModal = pendingAction?.type === "PEEK_AND_SWAP_DECIDE" && pendingAction.initiatorId === mySessionId;
-  const showFloodModal = pendingAction?.type === "FLOOD_WAITING" && !pendingAction.data?.isTimeWarp
-    && me?.isAlive && !pendingAction.floodDiscarded?.includes(mySessionId);
-  const showFloodWaitingModal = pendingAction?.type === "FLOOD_WAITING" && !pendingAction.data?.isTimeWarp
-    && me?.isAlive && pendingAction.floodDiscarded?.includes(mySessionId);
-  const showTimeWarpModal = pendingAction?.type === "FLOOD_WAITING" && pendingAction.data?.isTimeWarp
-    && pendingAction.initiatorId === mySessionId;
+  const showWaterBucketModal =
+    pendingAction?.type === "WATER_BUCKET_PLACE" &&
+    pendingAction.initiatorId === mySessionId;
+  const showBribeModal =
+    pendingAction?.type === "BRIBE_WAITING" &&
+    pendingAction.targetId === mySessionId;
+  const showPeekSwapModal =
+    pendingAction?.type === "PEEK_AND_SWAP_DECIDE" &&
+    pendingAction.initiatorId === mySessionId;
+  const showFloodModal =
+    pendingAction?.type === "FLOOD_WAITING" &&
+    !pendingAction.data?.isTimeWarp &&
+    me?.isAlive &&
+    !pendingAction.floodDiscarded?.includes(mySessionId);
+  const showFloodWaitingModal =
+    pendingAction?.type === "FLOOD_WAITING" &&
+    !pendingAction.data?.isTimeWarp &&
+    me?.isAlive &&
+    pendingAction.floodDiscarded?.includes(mySessionId);
+  const showTimeWarpModal =
+    pendingAction?.type === "FLOOD_WAITING" &&
+    Boolean(pendingAction.data?.isTimeWarp) &&
+    pendingAction.initiatorId === mySessionId;
 
   // Gang target picker — dipicu lokal sebelum kartu dikirim ke server
   const showGangPicker = pendingGangCardIds !== null;
@@ -198,7 +263,8 @@ export default function RoomPage() {
   const canDraw = myTurn && !hasPendingAction;
 
   const initiatorName = pendingAction
-    ? gameState.players.find(p => p.sessionId === pendingAction.initiatorId)?.username ?? "Seseorang"
+    ? (gameState.players.find((p) => p.sessionId === pendingAction.initiatorId)
+        ?.username ?? "Seseorang")
     : "";
 
   return (
@@ -240,7 +306,9 @@ export default function RoomPage() {
 
       {!me?.isAlive && (
         <div className="fixed bottom-0 left-0 right-0 bg-obsidian-2 border-t border-ember/30 p-6 text-center">
-          <p className="text-ember font-display">💀 Kamu sudah tereliminasi. Tonton sisa permainan!</p>
+          <p className="text-ember font-display">
+            💀 Kamu sudah tereliminasi. Tonton sisa permainan!
+          </p>
         </div>
       )}
 
@@ -265,32 +333,58 @@ export default function RoomPage() {
       )}
 
       {showWaterBucketModal && (
-        <WaterBucketModal deckCount={gameState.deckCount} onConfirm={handleWaterBucket} />
+        <WaterBucketModal
+          deckCount={gameState.deckCount}
+          onConfirm={handleWaterBucket}
+        />
       )}
 
       {showBribeModal && (
-        <BribeModal myHand={myHand} initiatorName={initiatorName} onGiveCard={handleBribeGive} />
+        <BribeModal
+          myHand={myHand}
+          initiatorName={initiatorName}
+          onGiveCard={handleBribeGive}
+        />
       )}
 
       {showFloodModal && (
-        <FloodModal myHand={myHand} alreadyDiscarded={false} onDiscard={handleFloodDiscard} />
+        <FloodModal
+          myHand={myHand}
+          alreadyDiscarded={false}
+          onDiscard={handleFloodDiscard}
+        />
       )}
 
       {showFloodWaitingModal && (
-        <FloodModal myHand={myHand} alreadyDiscarded={true} onDiscard={handleFloodDiscard} />
+        <FloodModal
+          myHand={myHand}
+          alreadyDiscarded={true}
+          onDiscard={handleFloodDiscard}
+        />
       )}
 
       {showTimeWarpModal && (
-        <TimeWarpModal discardPile={gameState.discardPile} onPick={handleFloodDiscard} />
+        <TimeWarpModal
+          discardPile={gameState.discardPile}
+          onPick={handleFloodDiscard}
+        />
       )}
 
       {showGangPicker && (
         <GangPlayerPicker
-          title={isGangRainbow ? "Full Riot!" : gangCardCount === 3 ? "Pilih Target & Kartu" : "Pilih Target"}
+          title={
+            isGangRainbow
+              ? "Full Riot!"
+              : gangCardCount === 3
+                ? "Pilih Target & Kartu"
+                : "Pilih Target"
+          }
           description={
-            isGangRainbow ? "Pilih pemain untuk swap seluruh tangan" :
-            gangCardCount === 3 ? "Steal 1 kartu random dari pemain ini" :
-            "Steal 1 kartu random dari pemain ini"
+            isGangRainbow
+              ? "Pilih pemain untuk swap seluruh tangan"
+              : gangCardCount === 3
+                ? "Steal 1 kartu random dari pemain ini"
+                : "Steal 1 kartu random dari pemain ini"
           }
           emoji={isGangRainbow ? "🌈" : gangCardCount === 3 ? "🎯" : "👥"}
           players={gameState.players}

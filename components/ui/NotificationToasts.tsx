@@ -1,8 +1,8 @@
 "use client";
-import { useGameStore } from "@/store/gameStore";
+import { useGameStore, Notification } from "@/store/gameStore";
 import clsx from "clsx";
 
-const TOAST_STYLES = {
+const TOAST_STYLES: Record<Notification["type"], string> = {
   info:    "border-ash/40 bg-obsidian-3 text-cream",
   error:   "border-ember/60 bg-ember/10 text-cream",
   success: "border-gang-earth/60 bg-gang-earth/10 text-cream",
