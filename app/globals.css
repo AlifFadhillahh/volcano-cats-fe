@@ -1,0 +1,92 @@
+@import url('https://fonts.googleapis.com/css2?family=Righteous&family=Inter:wght@400;500;600;700&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --obsidian: #0D0D0F;
+  --lava: #FF5C1A;
+  --gold: #FFB547;
+  --cream: #F0EAD6;
+  --ash: #8A8A99;
+}
+
+html, body {
+  background-color: var(--obsidian);
+  color: var(--cream);
+  font-family: 'Inter', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #1C1C24; }
+::-webkit-scrollbar-thumb { background: #3A3A55; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #FF5C1A; }
+
+/* Card 3D perspective */
+.card-3d-container { perspective: 1000px; }
+.card-3d {
+  transform-style: preserve-3d;
+  transition: transform 0.3s ease;
+}
+.card-3d:hover { transform: translateY(-8px) rotateX(5deg); }
+.card-3d-back { backface-visibility: hidden; }
+
+/* Lava border animation */
+@keyframes lavaBorder {
+  0%, 100% { border-color: rgba(255,92,26,0.4); }
+  50%       { border-color: rgba(255,92,26,1); }
+}
+.lava-border { animation: lavaBorder 1.5s ease-in-out infinite; }
+
+/* Ember particles */
+.ember {
+  position: fixed;
+  width: 3px;
+  height: 3px;
+  background: var(--lava);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Card selected state */
+.card-selected {
+  transform: translateY(-16px) !important;
+  box-shadow: 0 0 20px var(--lava), 0 0 40px rgba(255,92,26,0.3) !important;
+}
+
+/* Tooltip */
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1C1C24;
+  border: 1px solid #3A3A55;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--cream);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+  opacity: 0;
+  transition: opacity 0.15s;
+  max-width: 200px;
+  white-space: normal;
+  text-align: center;
+}
+.tooltip-trigger:hover .tooltip { opacity: 1; }
+
+/* Animations for reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
