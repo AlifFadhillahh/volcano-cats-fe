@@ -43,7 +43,7 @@ export default function RoomPage() {
 
   // Saat join, roomId yang dipakai untuk connect = ID asli dari URL (Colyseus room ID).
   // Saat create, kita belum punya ID sampai Colyseus merespons (lihat useEffect di bawah).
-  const { connect, sendMessage } = useColyseusRoom(username);
+  const { connect, sendMessage, disconnect } = useColyseusRoom(username);
   const [connectAttempted, setConnectAttempted] = useState(false);
   const [pendingGangCardIds, setPendingGangCardIds] = useState<string[] | null>(
     null,
@@ -67,12 +67,20 @@ export default function RoomPage() {
 
   // Begitu room berhasil dibuat & roomId asli Colyseus diketahui (lewat gameState.roomId),
   // perbaiki URL di address bar dari /room/_new jadi /room/<roomId-asli> agar bisa di-share/bookmark.
+  //
+  // PENTING: pakai window.history.replaceState (bukan router.replace dari Next.js).
+  // router.replace() mengganti params.id pada dynamic route [id], yang membuat Next.js
+  // unmount + remount komponen RoomPage ini. Remount itu memicu cleanup effect di
+  // useColyseusRoom yang leave() room — padahal room itu baru saja dibuat dan masih kosong.
+  // Akibatnya room langsung auto-dispose di server, dan siapa pun yang join lewat link
+  // hasil copy akan dapat "room not found". history.replaceState mengubah URL bar tanpa
+  // menyentuh siklus render React sama sekali, jadi koneksi WebSocket yang sudah jalan tetap utuh.
   useEffect(() => {
     if (isCreating && gameState?.roomId) {
       setRoomId(gameState.roomId);
-      router.replace(`/room/${gameState.roomId}`);
+      window.history.replaceState(null, "", `/room/${gameState.roomId}`);
     }
-  }, [isCreating, gameState?.roomId, router, setRoomId]);
+  }, [isCreating, gameState?.roomId, setRoomId]);
 
   // roomId yang ditampilkan di UI (lobby code, top bar, dll) — selalu pakai ID asli dari server kalau sudah ada
   const displayRoomId = gameState?.roomId ?? (isCreating ? "..." : urlRoomId);
@@ -190,7 +198,7 @@ export default function RoomPage() {
             Room tidak ditemukan, sudah penuh, atau server sedang bermasalah.
           </p>
           <button
-            onClick={() => router.push("/")}
+            onClick={() => { disconnect(); router.push("/"); }}
             className="px-6 py-3 bg-lava-gradient rounded-xl font-display text-white"
           >
             Kembali ke Menu
@@ -231,7 +239,7 @@ export default function RoomPage() {
     return (
       <>
         <NotificationToasts />
-        <GameOver gameState={gameState} mySessionId={mySessionId} />
+        <GameOver gameState={gameState} mySessionId={mySessionId} onLeave={disconnect} />
       </>
     );
   }

@@ -6,9 +6,10 @@ import { EmberParticles } from "@/components/animations/EmberParticles";
 interface GameOverProps {
   gameState: ClientGameState;
   mySessionId: string | null;
+  onLeave?: () => void;
 }
 
-export function GameOver({ gameState, mySessionId }: GameOverProps) {
+export function GameOver({ gameState, mySessionId, onLeave }: GameOverProps) {
   const router = useRouter();
   const winner = gameState.players.find(p => p.sessionId === gameState.winner);
   const iWon = gameState.winner === mySessionId;
@@ -54,7 +55,7 @@ export function GameOver({ gameState, mySessionId }: GameOverProps) {
         </div>
 
         <button
-          onClick={() => router.push("/")}
+          onClick={() => { onLeave?.(); router.push("/"); }}
           className="w-full py-4 rounded-xl font-display text-xl text-white bg-lava-gradient hover:shadow-lava-glow transition-all active:scale-95"
         >
           🏠 Kembali ke Menu
