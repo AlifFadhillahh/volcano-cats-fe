@@ -23,15 +23,15 @@ export default function HomePage() {
     if (!name) { setError("Masukkan username dulu!"); return; }
     localStorage.setItem("vc_username", name);
     setUsername(name);
-    // Room ID dibuat di halaman room saat connect
-    const newRoomId = Math.random().toString(36).slice(2, 8).toUpperCase();
-    setRoomId(newRoomId);
-    router.push(`/room/${newRoomId}?create=true`);
+    // Room ID asli akan didapat dari Colyseus setelah create() dipanggil di halaman room.
+    // "_new" adalah sinyal "buat room baru" — URL akan diperbaiki otomatis
+    // ke roomId asli begitu Colyseus merespons.
+    router.push(`/room/_new`);
   }
 
   function handleJoin() {
     const name = nameInput.trim();
-    const code = roomInput.trim().toUpperCase();
+    const code = roomInput.trim();
     if (!name) { setError("Masukkan username dulu!"); return; }
     if (!code || code.length < 4) { setError("Masukkan kode room yang valid!"); return; }
     localStorage.setItem("vc_username", name);
@@ -86,15 +86,15 @@ export default function HomePage() {
               <label className="block text-ash text-xs uppercase tracking-widest mb-2">Kode Room</label>
               <input
                 type="text"
-                maxLength={8}
-                placeholder="Contoh: XK92BV"
+                maxLength={12}
+                placeholder="Contoh: aB3xK9pL2"
                 value={roomInput}
-                onChange={e => { setRoomInput(e.target.value.toUpperCase()); setError(""); }}
+                onChange={e => { setRoomInput(e.target.value); setError(""); }}
                 onKeyDown={e => e.key === "Enter" && handleJoin()}
                 className="w-full bg-obsidian-2 border border-card-border rounded-xl px-4 py-3 text-cream placeholder-ash/50
                            font-display tracking-widest text-center text-xl
                            focus:outline-none focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,181,71,0.2)]
-                           transition-all duration-200 mb-4 uppercase"
+                           transition-all duration-200 mb-4"
               />
             </>
           )}

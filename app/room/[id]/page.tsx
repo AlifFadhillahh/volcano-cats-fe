@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useSearchParams, useRouter } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useGameStore } from "@/store/gameStore";
 import { useColyseusRoom } from "@/lib/useColyseusRoom";
 import { Lobby } from "@/components/game/Lobby";
@@ -20,10 +20,9 @@ import { EmberParticles } from "@/components/animations/EmberParticles";
 
 export default function RoomPage() {
   const params = useParams();
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const roomId = params.id as string;
-  const isCreating = searchParams.get("create") === "true";
+  const urlRoomId = params.id as string;
+  const isCreating = urlRoomId === "_new";
 
   const {
     username,
@@ -39,9 +38,12 @@ export default function RoomPage() {
     getMe,
     showLog,
     toggleLog,
+    setRoomId,
   } = useGameStore();
 
-  const { connect, sendMessage } = useColyseusRoom(roomId, username);
+  // Saat join, roomId yang dipakai untuk connect = ID asli dari URL (Colyseus room ID).
+  // Saat create, kita belum punya ID sampai Colyseus merespons (lihat useEffect di bawah).
+  const { connect, sendMessage } = useColyseusRoom(username);
   const [connectAttempted, setConnectAttempted] = useState(false);
   const [pendingGangCardIds, setPendingGangCardIds] = useState<string[] | null>(
     null,
@@ -56,12 +58,24 @@ export default function RoomPage() {
     if (!connectAttempted) {
       setConnectAttempted(true);
       if (isCreating) {
-        connect(); // create new room
+        connect(); // create new room — Colyseus generate roomId sendiri
       } else {
-        connect(roomId); // join existing room
+        connect(urlRoomId); // join existing room pakai roomId asli dari Colyseus
       }
     }
-  }, [username, connectAttempted, isCreating, roomId, connect, router]);
+  }, [username, connectAttempted, isCreating, urlRoomId, connect, router]);
+
+  // Begitu room berhasil dibuat & roomId asli Colyseus diketahui (lewat gameState.roomId),
+  // perbaiki URL di address bar dari /room/_new jadi /room/<roomId-asli> agar bisa di-share/bookmark.
+  useEffect(() => {
+    if (isCreating && gameState?.roomId) {
+      setRoomId(gameState.roomId);
+      router.replace(`/room/${gameState.roomId}`);
+    }
+  }, [isCreating, gameState?.roomId, router, setRoomId]);
+
+  // roomId yang ditampilkan di UI (lobby code, top bar, dll) — selalu pakai ID asli dari server kalau sudah ada
+  const displayRoomId = gameState?.roomId ?? (isCreating ? "..." : urlRoomId);
 
   // ============================================================
   // ACTION HANDLERS
@@ -203,7 +217,7 @@ export default function RoomPage() {
         <NotificationToasts />
         <Lobby
           gameState={gameState}
-          roomId={roomId}
+          roomId={displayRoomId}
           onStartGame={handleStartGame}
         />
       </>
@@ -274,7 +288,7 @@ export default function RoomPage() {
 
       {/* Top bar */}
       <div className="relative z-20 flex justify-between items-center px-4 py-3">
-        <div className="font-display text-lava text-sm">🌋 {roomId}</div>
+        <div className="font-display text-lava text-sm">🌋 {displayRoomId}</div>
         <button
           onClick={toggleLog}
           className="text-ash hover:text-gold text-sm px-3 py-1.5 rounded-lg border border-card-border transition-colors"

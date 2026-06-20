@@ -15,7 +15,7 @@ function getClient(): Colyseus.Client {
   return clientInstance;
 }
 
-export function useColyseusRoom(roomId: string | null, username: string) {
+export function useColyseusRoom(username: string) {
   const roomRef = useRef<Colyseus.Room | null>(null);
   const {
     setConnectionStatus, setMySessionId, setGameState,
