@@ -22,6 +22,7 @@ export interface ClientPlayer {
   hasBunker: boolean;
   isLocked: boolean;
   connected: boolean;
+  away: boolean;
 }
 
 export type GameStatus = "lobby" | "playing" | "finished";
@@ -33,6 +34,7 @@ export interface PendingAction {
   targetId?: string;
   data?: Record<string, unknown>;
   floodDiscarded?: string[];
+  freezeWindowEndsAt?: number;
 }
 
 export interface GameLogEntry {

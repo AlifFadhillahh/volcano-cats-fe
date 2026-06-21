@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
+import clsx from "clsx";
 import { useGameStore } from "@/store/gameStore";
 import { useColyseusRoom } from "@/lib/useColyseusRoom";
 import { Lobby } from "@/components/game/Lobby";
@@ -16,6 +17,7 @@ import { FloodModal, TimeWarpModal } from "@/components/game/FloodModal";
 import { GangPlayerPicker } from "@/components/game/GangPlayerPicker";
 import { TargetingBanner } from "@/components/game/TargetingBanner";
 import { FreezeButton } from "@/components/game/FreezeButton";
+import { CardPlayAnimation } from "@/components/game/CardPlayAnimation";
 import { EmberParticles } from "@/components/animations/EmberParticles";
 
 export default function RoomPage() {
@@ -172,6 +174,11 @@ export default function RoomPage() {
     [sendMessage],
   );
 
+  const handleToggleAway = useCallback(() => {
+    const me = getMe();
+    sendMessage("TOGGLE_AWAY", { away: !me?.away });
+  }, [sendMessage, getMe]);
+
   // ============================================================
   // LOADING / CONNECTION STATES
   // ============================================================
@@ -289,6 +296,15 @@ export default function RoomPage() {
         ?.username ?? "Seseorang")
     : "";
 
+  // Nama pemain untuk caption animasi kartu — best-effort, ambil dari log
+  // entry "action" terakhir (format pesan log selalu diawali "{username} ...").
+  const lastActionPlayerName = (() => {
+    const lastAction = [...gameState.log].reverse().find((e) => e.type === "action");
+    if (!lastAction) return undefined;
+    const firstSpace = lastAction.message.indexOf(" ");
+    return firstSpace > 0 ? lastAction.message.slice(0, firstSpace) : undefined;
+  })();
+
   return (
     <div className="min-h-screen bg-table-felt flex flex-col relative overflow-hidden">
       <EmberParticles count={6} />
@@ -297,12 +313,27 @@ export default function RoomPage() {
       {/* Top bar */}
       <div className="relative z-20 flex justify-between items-center px-4 py-3">
         <div className="font-display text-lava text-sm">🌋 {displayRoomId}</div>
-        <button
-          onClick={toggleLog}
-          className="text-ash hover:text-gold text-sm px-3 py-1.5 rounded-lg border border-card-border transition-colors"
-        >
-          📜 Log
-        </button>
+        <div className="flex items-center gap-2">
+          {me?.isAlive && (
+            <button
+              onClick={handleToggleAway}
+              className={clsx(
+                "text-sm px-3 py-1.5 rounded-lg border transition-colors",
+                me.away
+                  ? "border-gold bg-gold/10 text-gold"
+                  : "border-card-border text-ash hover:text-cream"
+              )}
+            >
+              {me.away ? "😴 Away (tap untuk aktif)" : "💤 Set Away"}
+            </button>
+          )}
+          <button
+            onClick={toggleLog}
+            className="text-ash hover:text-gold text-sm px-3 py-1.5 rounded-lg border border-card-border transition-colors"
+          >
+            📜 Log
+          </button>
+        </div>
       </div>
 
       {/* Game table */}
@@ -313,6 +344,12 @@ export default function RoomPage() {
         canDraw={canDraw}
         onSelectTarget={targetingMode ? handleSelectTarget : undefined}
         targetingMode={targetingMode}
+      />
+
+      {/* Animasi kartu dimainkan — trigger otomatis tiap discard pile berubah */}
+      <CardPlayAnimation
+        lastDiscardedCard={gameState.discardPile[gameState.discardPile.length - 1] ?? null}
+        playerName={lastActionPlayerName}
       />
 
       {/* Player hand */}
@@ -337,11 +374,15 @@ export default function RoomPage() {
       {/* Targeting banner */}
       <TargetingBanner onCancel={exitTargetingMode} />
 
-      {/* Freeze interrupt button - visible to everyone except current turn player during pending actions */}
+      {/* Freeze interrupt window — cuma muncul untuk kartu yang sedang menunggu
+          freeze window (AWAITING_FREEZE), bukan pending action lain seperti
+          Bribe/Flood yang punya alur input sendiri */}
       <FreezeButton
         hand={myHand}
         onFreeze={handleFreeze}
-        visible={hasPendingAction && pendingAction?.initiatorId !== mySessionId}
+        visible={pendingAction?.type === "AWAITING_FREEZE" && pendingAction?.initiatorId !== mySessionId}
+        freezeWindowEndsAt={pendingAction?.freezeWindowEndsAt}
+        initiatorName={initiatorName}
       />
 
       {/* Game log sidebar */}

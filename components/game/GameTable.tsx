@@ -32,7 +32,7 @@ export function GameTable({ gameState, mySessionId, onDrawCard, canDraw, onSelec
   });
 
   return (
-    <div className={clsx("relative w-full flex-1 flex flex-col items-center justify-between pt-6 pb-4", isShaking && "animate-shake")}>
+    <div className={clsx("relative w-full flex-1 flex flex-col items-center justify-between pt-6 pb-44", isShaking && "animate-shake")}>
       {/* Turn banner */}
       <div className="text-center mb-2 h-8">
         {gameState.pendingTurns > 1 && (

@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
+import Image from "next/image";
 import { Card, CARD_META, CardType } from "@/types/game";
+import { getCardTheme } from "@/lib/cardTheme";
 import clsx from "clsx";
 
 interface GameCardProps {
@@ -19,6 +21,7 @@ export function GameCard({
 }: GameCardProps) {
   const [hovered, setHovered] = useState(false);
   const meta = CARD_META[card.type as CardType];
+  const theme = getCardTheme(card.type as CardType);
 
   const w = small ? "w-16" : "w-24";
   const h = small ? "h-24" : "h-36";
@@ -49,7 +52,7 @@ export function GameCard({
       {faceDown ? (
         <CardBack small={small} />
       ) : (
-        <CardFace card={card} meta={meta} small={small} />
+        <CardFace card={card} meta={meta} theme={theme} small={small} />
       )}
 
       {/* Tooltip */}
@@ -61,24 +64,68 @@ export function GameCard({
                      animate-slide-up"
           style={{ borderColor: meta.color + "66" }}
         >
-          <p className="font-display text-sm mb-1" style={{ color: meta.color }}>{card.name}</p>
-          <p className="text-ash leading-relaxed">{card.description}</p>
+          <p className="font-display text-sm mb-1" style={{ color: meta.color }}>{theme.displayName}</p>
+          <p className="text-ash leading-relaxed">{theme.displayDescription}</p>
         </div>
       )}
     </div>
   );
 }
 
-function CardFace({ card, meta, small }: { card: Card; meta: typeof CARD_META[CardType]; small: boolean }) {
+function CardFace({
+  card, meta, theme, small,
+}: {
+  card: Card;
+  meta: typeof CARD_META[CardType];
+  theme: ReturnType<typeof getCardTheme>;
+  small: boolean;
+}) {
+  // Kalau ada gambar custom, tampilkan sebagai background image penuh dengan
+  // nama kartu sebagai caption di bawah (gradient overlay supaya teks tetap
+  // terbaca di atas gambar apapun). Kalau tidak ada gambar, fallback ke
+  // tampilan emoji + gradient warna seperti desain asli.
+  if (theme.image) {
+    return (
+      <div className="w-full h-full rounded-xl overflow-hidden relative">
+        <Image
+          src={theme.image}
+          alt={theme.displayName}
+          fill
+          sizes={small ? "64px" : "96px"}
+          className="object-cover"
+          // Gambar custom yang di-upload user mungkin tidak selalu optimal
+          // dimensinya — unoptimized supaya tidak gagal build kalau ukuran aneh.
+          unoptimized
+        />
+        {/* Gradient overlay bawah supaya nama kartu tetap terbaca */}
+        <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+
+        {!small && (
+          <div
+            className="absolute top-1.5 left-1.5 text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded font-display"
+            style={{ background: meta.color + "55", color: "#fff" }}
+          >
+            {meta.category}
+          </div>
+        )}
+
+        <div className="absolute bottom-1.5 inset-x-1.5 text-center">
+          <p className="font-display text-white text-[10px] leading-tight tracking-wide uppercase drop-shadow-md">
+            {theme.displayName}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback: emoji + gradient warna (desain original)
   return (
     <div
       className="w-full h-full rounded-xl flex flex-col items-center justify-between p-2 overflow-hidden relative"
       style={{ background: meta.bgGradient }}
     >
-      {/* Shine overlay */}
       <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/10 to-transparent pointer-events-none" />
 
-      {/* Category badge */}
       {!small && (
         <div
           className="self-start text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded font-display"
@@ -88,16 +135,14 @@ function CardFace({ card, meta, small }: { card: Card; meta: typeof CARD_META[Ca
         </div>
       )}
 
-      {/* Emoji */}
       <div className={clsx("text-center", small ? "text-3xl" : "text-4xl my-1")}>
         {card.emoji}
       </div>
 
-      {/* Name */}
       {!small && (
         <div className="text-center">
           <p className="font-display text-white text-[10px] leading-tight tracking-wide uppercase">
-            {card.name}
+            {theme.displayName}
           </p>
         </div>
       )}

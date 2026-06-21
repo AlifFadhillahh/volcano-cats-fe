@@ -68,7 +68,12 @@ export function PlayerAvatar({ player, isCurrentTurn, isMe, isDying, onClick, ta
             <div className="absolute -bottom-1 -right-1 text-sm">🔒</div>
           )}
 
-          {/* Disconnected */}
+          {/* Away (manual) */}
+          {player.away && player.isAlive && (
+            <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center text-xs">😴</div>
+          )}
+
+          {/* Disconnected (otomatis) — beda dari away manual, prioritas tampil duluan kalau dua-duanya true */}
           {!player.connected && player.isAlive && (
             <div className="absolute inset-0 rounded-full bg-black/60 flex items-center justify-center text-xs">📡</div>
           )}
@@ -84,10 +89,10 @@ export function PlayerAvatar({ player, isCurrentTurn, isMe, isDying, onClick, ta
         )}>
           {player.username}{isMe ? " (kamu)" : ""}
         </p>
-        {/* Card count */}
+        {/* Card count + status */}
         {player.isAlive && (
           <p className="text-ash text-[10px]">
-            {player.handCount} kartu
+            {!player.connected ? "Offline · auto-play" : player.away ? "Away · auto-play" : `${player.handCount} kartu`}
           </p>
         )}
       </div>
