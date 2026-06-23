@@ -1,7 +1,8 @@
 "use client";
-import { useMemo } from "react";
-import { Card, CardType, isGangCard, NEEDS_TARGET, GANG_TYPES } from "@/types/game";
+import { useMemo, useState } from "react";
+import { Card, CardType, isGangCard, NEEDS_TARGET, GANG_TYPES, CARD_META } from "@/types/game";
 import { GameCard } from "@/components/game/GameCard";
+import { getCardTheme } from "@/lib/cardTheme";
 import { useGameStore } from "@/store/gameStore";
 import clsx from "clsx";
 
@@ -63,6 +64,7 @@ function getQuickGangAction(count: number): { playCount: number; label: string; 
 
 export function PlayerHand({ hand, isMyTurn, onPlayCard, onPlayGang, hasPendingAction }: PlayerHandProps) {
   const { selectedCards, toggleCardSelection, clearSelection } = useGameStore();
+  const [hoveredCard, setHoveredCard] = useState<Card | null>(null);
 
   const groups = useMemo(() => groupHand(hand), [hand]);
 
@@ -230,6 +232,7 @@ export function PlayerHand({ hand, isMyTurn, onPlayCard, onPlayGang, hasPendingA
                           selected={selectedCards.includes(card.id)}
                           disabled={!canInteract || card.type === "LAVA_CAT" || card.type === "WATER_BUCKET"}
                           onClick={() => handleCardClick(card)}
+                          onHoverChange={(hovering) => setHoveredCard(hovering ? card : null)}
                         />
                       </div>
                     ))}
@@ -240,6 +243,26 @@ export function PlayerHand({ hand, isMyTurn, onPlayCard, onPlayGang, hasPendingA
           </div>
         )}
       </div>
+
+      {/* Tooltip kartu — di-lift ke level PlayerHand (fixed position, BUKAN
+          absolute relatif ke kartu) supaya tidak ke-clip oleh overflow-x-auto
+          pada area scroll hand. Muncul di atas area hand, mengikuti kartu mana
+          yang sedang di-hover lewat onHoverChange dari GameCard. */}
+      {hoveredCard && (
+        <div className="fixed bottom-[180px] left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-slide-up">
+          <div
+            className="bg-obsidian-3 border rounded-lg px-4 py-2.5 text-xs text-cream w-52 text-center shadow-2xl"
+            style={{ borderColor: CARD_META[hoveredCard.type as CardType].color + "88" }}
+          >
+            <p className="font-display text-sm mb-1" style={{ color: CARD_META[hoveredCard.type as CardType].color }}>
+              {getCardTheme(hoveredCard.type as CardType).displayName}
+            </p>
+            <p className="text-ash leading-relaxed">
+              {getCardTheme(hoveredCard.type as CardType).displayDescription}
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -57,6 +57,7 @@ export interface ClientGameState {
   pendingAction: PendingAction | null;
   winner: string | null;
   log: GameLogEntry[];
+  turnEndsAt: number | null;
 }
 
 // Card metadata for UI rendering

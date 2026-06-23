@@ -94,6 +94,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
         });
       }
     }
+
+    // Defense in depth: server SEHARUSNYA selalu kirim hand kita lewat pesan
+    // YOUR_HAND terpisah di setiap titik yang mengubah hand. Tapi kalau ada
+    // satu titik di backend yang lupa melakukannya, GAME_STATE_UPDATE
+    // sebenarnya sudah membawa hand kita sendiri juga (lihat serializeForClient
+    // di backend — field `hand` diisi untuk pemain yang sesuai dengan viewerId).
+    // Sinkronkan dari sini sebagai fallback supaya hand tidak pernah "macet"
+    // kosong gara-gara satu titik update yang terlewat.
+    const { mySessionId } = get();
+    if (mySessionId) {
+      const myPlayerEntry = s.players.find(p => p.sessionId === mySessionId);
+      if (myPlayerEntry?.hand) {
+        set({ myHand: myPlayerEntry.hand });
+      }
+    }
+
     set({ gameState: s });
   },
 

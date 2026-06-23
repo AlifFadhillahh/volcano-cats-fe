@@ -13,11 +13,17 @@ interface GameCardProps {
   small?: boolean;
   onClick?: () => void;
   className?: string;
+  // Dipanggil saat hover mulai/berakhir — dipakai parent (PlayerHand) untuk
+  // menampilkan tooltip di posisi fixed terpisah, supaya tidak ke-clip oleh
+  // container overflow-x-auto pada hand kartu. Opsional: kalau tidak di-pass,
+  // GameCard tetap berfungsi normal tanpa tooltip (dipakai di tempat lain
+  // seperti discard pile / deck preview yang tidak butuh tooltip).
+  onHoverChange?: (hovering: boolean) => void;
 }
 
 export function GameCard({
   card, selected = false, disabled = false,
-  faceDown = false, small = false, onClick, className,
+  faceDown = false, small = false, onClick, className, onHoverChange,
 }: GameCardProps) {
   const [hovered, setHovered] = useState(false);
   const meta = CARD_META[card.type as CardType];
@@ -26,27 +32,40 @@ export function GameCard({
   const w = small ? "w-16" : "w-24";
   const h = small ? "h-24" : "h-36";
 
+  function handleEnter() {
+    setHovered(true);
+    onHoverChange?.(true);
+  }
+  function handleLeave() {
+    setHovered(false);
+    onHoverChange?.(false);
+  }
+
   return (
     <div
       className={clsx(
-        "relative cursor-pointer select-none rounded-xl border transition-all duration-200",
+        "relative cursor-pointer select-none rounded-xl border-2 transition-all duration-200",
         "card-3d-container group",
         w, h,
         selected && "card-selected",
-        disabled && "opacity-40 cursor-not-allowed",
+        disabled && "cursor-not-allowed",
         !disabled && !selected && "hover:-translate-y-2",
         className,
       )}
       onClick={!disabled ? onClick : undefined}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onMouseEnter={handleEnter}
+      onMouseLeave={handleLeave}
       style={{
-        borderColor: hovered || selected ? meta.color : "#2E2E44",
+        borderColor: disabled
+          ? "#2E2E44"
+          : (hovered || selected ? meta.color : meta.color + "88"),
         boxShadow: selected
           ? `0 0 24px ${meta.glowColor}, 0 0 48px ${meta.glowColor.replace("0.8","0.3")}`
+          : disabled
+          ? "none"
           : hovered
-          ? `0 8px 24px rgba(0,0,0,0.6), 0 0 12px ${meta.glowColor}`
-          : "0 4px 12px rgba(0,0,0,0.5)",
+          ? `0 8px 24px rgba(0,0,0,0.6), 0 0 16px ${meta.glowColor}`
+          : `0 4px 12px rgba(0,0,0,0.5), 0 0 6px ${meta.color}40`,
       }}
     >
       {faceDown ? (
@@ -55,18 +74,12 @@ export function GameCard({
         <CardFace card={card} meta={meta} theme={theme} small={small} />
       )}
 
-      {/* Tooltip */}
-      {!small && hovered && (
-        <div
-          className="absolute bottom-[calc(100%+8px)] left-1/2 -translate-x-1/2 z-50
-                     bg-obsidian-3 border border-card-border rounded-lg px-3 py-2
-                     text-xs text-cream w-44 text-center shadow-xl pointer-events-none
-                     animate-slide-up"
-          style={{ borderColor: meta.color + "66" }}
-        >
-          <p className="font-display text-sm mb-1" style={{ color: meta.color }}>{theme.displayName}</p>
-          <p className="text-ash leading-relaxed">{theme.displayDescription}</p>
-        </div>
+      {/* Overlay gelap untuk kartu yang tidak bisa dimainkan — lebih jelas
+          kontrasnya dibanding opacity, dan tidak bikin gambar/warna kartu
+          jadi pudar tanpa makna (overlay solid lebih jelas "tidak bisa diklik"
+          dibanding sekadar transparan). */}
+      {disabled && (
+        <div className="absolute inset-0 rounded-xl bg-black/65 pointer-events-none" />
       )}
     </div>
   );
@@ -164,7 +177,7 @@ function CardBack({ small }: { small: boolean }) {
 }
 
 // Stack of face-down cards (deck)
-export function CardDeckStack({ count, onClick }: { count: number; onClick?: () => void }) {
+export function CardDeckStack({ count, onClick, highlight }: { count: number; onClick?: () => void; highlight?: boolean }) {
   const stackCount = Math.min(4, Math.ceil(count / 10));
   return (
     <div className="relative cursor-pointer group" onClick={onClick}>
@@ -175,10 +188,15 @@ export function CardDeckStack({ count, onClick }: { count: number; onClick?: () 
           style={{ top: -i * 2, left: -i * 1, zIndex: i }}
         />
       ))}
-      <div className="relative w-24 h-36 rounded-xl border border-lava/40 bg-card-gradient
-                      flex flex-col items-center justify-center gap-1
-                      group-hover:border-lava group-hover:shadow-lava-glow
-                      transition-all duration-200"
+      <div
+        className={clsx(
+          "relative w-24 h-36 rounded-xl bg-card-gradient",
+          "flex flex-col items-center justify-center gap-1",
+          "transition-all duration-200",
+          highlight
+            ? "border-2 border-ember shadow-[0_0_20px_rgba(192,57,43,0.6)] animate-lava-pulse"
+            : "border border-lava/40 group-hover:border-lava group-hover:shadow-lava-glow"
+        )}
         style={{ zIndex: stackCount }}
       >
         <div className="absolute inset-0 rounded-xl overflow-hidden">

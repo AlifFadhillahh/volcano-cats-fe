@@ -16,7 +16,6 @@ import { BribeModal } from "@/components/game/BribeModal";
 import { FloodModal, TimeWarpModal } from "@/components/game/FloodModal";
 import { GangPlayerPicker } from "@/components/game/GangPlayerPicker";
 import { TargetingBanner } from "@/components/game/TargetingBanner";
-import { FreezeButton } from "@/components/game/FreezeButton";
 import { CardPlayAnimation } from "@/components/game/CardPlayAnimation";
 import { EmberParticles } from "@/components/animations/EmberParticles";
 
@@ -179,6 +178,12 @@ export default function RoomPage() {
     sendMessage("TOGGLE_AWAY", { away: !me?.away });
   }, [sendMessage, getMe]);
 
+  const handleLeave = useCallback(() => {
+    sendMessage("TOGGLE_AWAY", { away: true });
+    disconnect();
+    router.push("/");
+  }, [sendMessage, disconnect, router]);
+
   // ============================================================
   // LOADING / CONNECTION STATES
   // ============================================================
@@ -290,6 +295,9 @@ export default function RoomPage() {
   const isGangRainbow = gangCardCount === 5;
 
   const canDraw = myTurn && !hasPendingAction;
+  // Pemain kena Lockdown: satu-satunya aksi valid adalah draw, semua kartu di
+  // tangan harus gelap (hasPendingAction = true supaya PlayerHand disable semua)
+  const amILocked = Boolean(me?.isLocked && myTurn);
 
   const initiatorName = pendingAction
     ? (gameState.players.find((p) => p.sessionId === pendingAction.initiatorId)
@@ -324,7 +332,7 @@ export default function RoomPage() {
                   : "border-card-border text-ash hover:text-cream"
               )}
             >
-              {me.away ? "😴 Away (tap untuk aktif)" : "💤 Set Away"}
+              {me.away ? "😴 Away" : "💤 Away"}
             </button>
           )}
           <button
@@ -332,6 +340,12 @@ export default function RoomPage() {
             className="text-ash hover:text-gold text-sm px-3 py-1.5 rounded-lg border border-card-border transition-colors"
           >
             📜 Log
+          </button>
+          <button
+            onClick={handleLeave}
+            className="text-ash hover:text-ember text-sm px-3 py-1.5 rounded-lg border border-card-border hover:border-ember/50 transition-colors"
+          >
+            🚪 Keluar
           </button>
         </div>
       </div>
@@ -344,6 +358,11 @@ export default function RoomPage() {
         canDraw={canDraw}
         onSelectTarget={targetingMode ? handleSelectTarget : undefined}
         targetingMode={targetingMode}
+        isMyTurn={myTurn}
+        amILocked={amILocked}
+        myHandHasFreeze={myHand.some(c => c.type === "FREEZE")}
+        onFreeze={handleFreeze}
+        pendingAction={pendingAction}
       />
 
       {/* Animasi kartu dimainkan — trigger otomatis tiap discard pile berubah */}
@@ -359,7 +378,7 @@ export default function RoomPage() {
           isMyTurn={myTurn}
           onPlayCard={handlePlayCard}
           onPlayGang={handlePlayGang}
-          hasPendingAction={hasPendingAction || targetingMode || showGangPicker}
+          hasPendingAction={hasPendingAction || targetingMode || showGangPicker || amILocked}
         />
       )}
 
@@ -374,19 +393,8 @@ export default function RoomPage() {
       {/* Targeting banner */}
       <TargetingBanner onCancel={exitTargetingMode} />
 
-      {/* Freeze interrupt window — cuma muncul untuk kartu yang sedang menunggu
-          freeze window (AWAITING_FREEZE), bukan pending action lain seperti
-          Bribe/Flood yang punya alur input sendiri */}
-      <FreezeButton
-        hand={myHand}
-        onFreeze={handleFreeze}
-        visible={pendingAction?.type === "AWAITING_FREEZE" && pendingAction?.initiatorId !== mySessionId}
-        freezeWindowEndsAt={pendingAction?.freezeWindowEndsAt}
-        initiatorName={initiatorName}
-      />
-
-      {/* Game log sidebar */}
-      <GameLog entries={gameState.log} visible={showLog} />
+      {/* Game log floating panel */}
+      <GameLog entries={gameState.log} visible={showLog} onClose={toggleLog} />
 
       {/* ============ MODALS ============ */}
       {showPeekSwapModal ? (

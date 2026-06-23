@@ -1,9 +1,54 @@
 "use client";
-import { ClientGameState } from "@/types/game";
+import { useEffect, useState } from "react";
+import { ClientGameState, PendingAction } from "@/types/game";
 import { PlayerAvatar } from "@/components/game/PlayerAvatar";
 import { CardDeckStack, GameCard } from "@/components/game/GameCard";
+import { TurnTimer } from "@/components/game/TurnTimer";
 import { useGameStore } from "@/store/gameStore";
 import clsx from "clsx";
+
+// ============================================================
+// Freeze Countdown Button — tampil di dalam GameTable sebelah deck
+// ============================================================
+function FreezeCountdownButton({ onFreeze, freezeWindowEndsAt }: { onFreeze: () => void; freezeWindowEndsAt?: number }) {
+  const [remainingMs, setRemainingMs] = useState<number>(
+    freezeWindowEndsAt ? Math.max(0, freezeWindowEndsAt - Date.now()) : 4000
+  );
+
+  useEffect(() => {
+    if (!freezeWindowEndsAt) return;
+    const tick = () => setRemainingMs(Math.max(0, freezeWindowEndsAt - Date.now()));
+    tick();
+    const interval = setInterval(tick, 100);
+    return () => clearInterval(interval);
+  }, [freezeWindowEndsAt]);
+
+  const totalMs = 4000;
+  const progress = Math.max(0, Math.min(1, remainingMs / totalMs));
+  const secondsLeft = Math.ceil(remainingMs / 1000);
+
+  return (
+    <button
+      onClick={onFreeze}
+      className="flex flex-col items-center gap-1 px-4 py-3 rounded-2xl
+                 bg-blue-500/20 border-2 border-blue-300 text-blue-200
+                 hover:bg-blue-500/30 active:scale-95
+                 transition-all duration-150 shadow-[0_0_20px_rgba(133,193,233,0.35)]
+                 animate-bounce-in min-w-[72px]"
+    >
+      <span className="text-2xl">❄️</span>
+      <span className="font-display text-xs tracking-wide">Freeze!</span>
+      {/* Mini countdown bar */}
+      <div className="w-full h-1 bg-blue-900/50 rounded-full overflow-hidden">
+        <div
+          className="h-full bg-blue-300 rounded-full transition-all duration-100"
+          style={{ width: `${progress * 100}%` }}
+        />
+      </div>
+      <span className="text-[10px] text-blue-300/70">{secondsLeft}s</span>
+    </button>
+  );
+}
 
 interface GameTableProps {
   gameState: ClientGameState;
@@ -12,14 +57,31 @@ interface GameTableProps {
   canDraw: boolean;
   onSelectTarget?: (targetId: string) => void;
   targetingMode: boolean;
+  isMyTurn: boolean;
+  amILocked: boolean;
+  // Freeze props — pindahkan di sini supaya Freeze button dekat deck (lebih terjangkau)
+  myHandHasFreeze: boolean;
+  onFreeze: () => void;
+  pendingAction: PendingAction | null;
 }
 
-export function GameTable({ gameState, mySessionId, onDrawCard, canDraw, onSelectTarget, targetingMode }: GameTableProps) {
+export function GameTable({
+  gameState, mySessionId, onDrawCard, canDraw, onSelectTarget,
+  targetingMode, isMyTurn, amILocked,
+  myHandHasFreeze, onFreeze, pendingAction,
+}: GameTableProps) {
   const { deadPlayers, isShaking } = useGameStore();
   const otherPlayers = gameState.players.filter(p => p.sessionId !== mySessionId);
   const currentTurnId = gameState.turnOrder[gameState.currentTurnIndex];
   const currentPlayer = gameState.players.find(p => p.sessionId === currentTurnId);
   const lastDiscard = gameState.discardPile[gameState.discardPile.length - 1];
+  const myPlayer = gameState.players.find(p => p.sessionId === mySessionId);
+
+  const showFreezeButton =
+    pendingAction?.type === "AWAITING_FREEZE" &&
+    pendingAction.initiatorId !== mySessionId &&
+    myHandHasFreeze &&
+    myPlayer?.isAlive;
 
   // Arrange other players in an arc around the top
   const radius = 130;
@@ -66,34 +128,59 @@ export function GameTable({ gameState, mySessionId, onDrawCard, canDraw, onSelec
         ))}
       </div>
 
-      {/* Center table: deck + discard */}
-      <div className="flex items-center gap-8 my-4">
-        {/* Discard pile */}
-        <div className="flex flex-col items-center gap-1">
-          <div className="w-24 h-36 rounded-xl border border-dashed border-card-border flex items-center justify-center relative">
-            {lastDiscard ? (
-              <div className="animate-card-deal">
-                <GameCard card={lastDiscard} disabled />
-              </div>
-            ) : (
-              <span className="text-ash text-xs">Discard</span>
+      {/* Center table: deck + discard + freeze button + turn timer */}
+      <div className="flex flex-col items-center gap-3 my-2 w-full px-8">
+        {/* Deck + Discard + Freeze row */}
+        <div className="flex items-center gap-6">
+          {/* Discard pile */}
+          <div className="flex flex-col items-center gap-1">
+            <div className="w-24 h-36 rounded-xl border border-dashed border-card-border flex items-center justify-center relative">
+              {lastDiscard ? (
+                <div className="animate-card-deal">
+                  <GameCard card={lastDiscard} disabled />
+                </div>
+              ) : (
+                <span className="text-ash text-xs">Discard</span>
+              )}
+            </div>
+            <span className="text-ash text-[10px] uppercase tracking-wider">
+              {gameState.discardPile.length} dibuang
+            </span>
+          </div>
+
+          {/* Deck */}
+          <div className="flex flex-col items-center gap-1">
+            <CardDeckStack
+              count={gameState.deckCount}
+              onClick={canDraw ? onDrawCard : undefined}
+              highlight={amILocked && isMyTurn}
+            />
+            {canDraw && (
+              <span className={clsx(
+                "text-xs font-display animate-glow-pulse",
+                amILocked ? "text-ember" : "text-lava"
+              )}>
+                {amILocked ? "🔒 Wajib draw!" : "👆 Tap untuk draw"}
+              </span>
             )}
           </div>
-          <span className="text-ash text-[10px] uppercase tracking-wider">
-            {gameState.discardPile.length} dibuang
-          </span>
-        </div>
 
-        {/* Deck */}
-        <div className="flex flex-col items-center gap-1">
-          <CardDeckStack
-            count={gameState.deckCount}
-            onClick={canDraw ? onDrawCard : undefined}
-          />
-          {canDraw && (
-            <span className="text-lava text-xs font-display animate-glow-pulse">👆 Tap untuk draw</span>
+          {/* Freeze button — sebelah deck, lebih terjangkau dari pojok layar.
+              Muncul saat ada AWAITING_FREEZE dan pemain punya kartu Freeze. */}
+          {showFreezeButton && (
+            <FreezeCountdownButton
+              onFreeze={onFreeze}
+              freezeWindowEndsAt={pendingAction?.freezeWindowEndsAt}
+            />
           )}
         </div>
+
+        {/* Turn timer */}
+        <TurnTimer
+          turnEndsAt={gameState.turnEndsAt}
+          isMyTurn={isMyTurn}
+          isLocked={amILocked}
+        />
       </div>
 
       {/* Current turn indicator */}
