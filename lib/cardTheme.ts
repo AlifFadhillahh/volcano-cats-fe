@@ -113,7 +113,7 @@ export const CARD_THEME: Record<CardType, CardThemeEntry> = {
   },
   BUNKER: {
     displayName: "Bunker",
-    displayDescription: "Pasang di depanmu. Batalkan efek negatif pertama yang kamu terima, lalu Bunker hancur.",
+    displayDescription: "Melindungi dari Lava Cat SAJA — jika draw Lava Cat, Bunker hancur dan Lava Cat kembali ke deck acak. Tidak melindungi dari Sniper, Pickpocket, Flood, dll.",
     // image: "/cards/bunker.webp",
   },
   PICKPOCKET: {

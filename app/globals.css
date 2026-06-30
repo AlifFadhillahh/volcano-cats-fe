@@ -14,7 +14,7 @@
 }
 
 html, body {
-  background-color: var(--obsidian);
+  background-color: #0a0e14;
   color: var(--cream);
   font-family: 'Inter', sans-serif;
   min-height: 100vh;

@@ -11,11 +11,21 @@ export default function HomePage() {
   const [roomInput, setRoomInput] = useState("");
   const [mode, setMode] = useState<"home" | "join">("home");
   const [error, setError] = useState("");
+  const [pendingRoomId, setPendingRoomId] = useState<string | null>(null);
 
-  // Load saved username
   useEffect(() => {
     const saved = localStorage.getItem("vc_username");
     if (saved) setNameInput(saved);
+
+    // Deteksi pending join dari link — kalau user buka link room tapi belum
+    // punya username, RoomPage menyimpan roomId ke localStorage sebelum redirect.
+    const pending = localStorage.getItem("vc_pending_join");
+    if (pending) {
+      localStorage.removeItem("vc_pending_join");
+      setPendingRoomId(pending);
+      setRoomInput(pending);
+      setMode("join");
+    }
   }, []);
 
   function handleCreate() {
@@ -23,9 +33,6 @@ export default function HomePage() {
     if (!name) { setError("Masukkan username dulu!"); return; }
     localStorage.setItem("vc_username", name);
     setUsername(name);
-    // Room ID asli akan didapat dari Colyseus setelah create() dipanggil di halaman room.
-    // "_new" adalah sinyal "buat room baru" — URL akan diperbaiki otomatis
-    // ke roomId asli begitu Colyseus merespons.
     router.push(`/room/_new`);
   }
 
@@ -44,7 +51,6 @@ export default function HomePage() {
     <div className="relative min-h-screen bg-obsidian flex flex-col items-center justify-center overflow-hidden">
       <EmberParticles count={18} />
 
-      {/* Background glow */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-lava/5 blur-3xl" />
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[300px] bg-ember/5 blur-3xl" />
@@ -65,15 +71,25 @@ export default function HomePage() {
           </p>
         </div>
 
+        {/* Banner kalau datang dari link undangan */}
+        {pendingRoomId && (
+          <div className="w-full bg-gold/10 border border-gold/40 rounded-xl px-4 py-2.5 text-center animate-bounce-in">
+            <p className="text-gold text-sm font-display">
+              🔗 Kamu diundang ke room <span className="text-cream">{pendingRoomId}</span>
+            </p>
+            <p className="text-ash text-xs mt-0.5">Masukkan username untuk join</p>
+          </div>
+        )}
+
         {/* Form */}
         <div className="w-full bg-obsidian-3 border border-card-border rounded-2xl p-6 shadow-[0_8px_40px_rgba(0,0,0,0.8)]">
-          {/* Username */}
           <label className="block text-ash text-xs uppercase tracking-widest mb-2">Username</label>
           <input
             type="text"
             maxLength={20}
             placeholder="Nama panggilanmu..."
             value={nameInput}
+            autoFocus
             onChange={e => { setNameInput(e.target.value); setError(""); }}
             onKeyDown={e => e.key === "Enter" && (mode === "join" ? handleJoin() : handleCreate())}
             className="w-full bg-obsidian-2 border border-card-border rounded-xl px-4 py-3 text-cream placeholder-ash/50
@@ -86,13 +102,19 @@ export default function HomePage() {
               <label className="block text-ash text-xs uppercase tracking-widest mb-2">Kode Room</label>
               <input
                 type="text"
-                maxLength={12}
-                placeholder="Contoh: aB3xK9pL2"
+                maxLength={20}
+                placeholder="Paste kode room atau link..."
                 value={roomInput}
-                onChange={e => { setRoomInput(e.target.value); setError(""); }}
+                onChange={e => {
+                  // Kalau paste URL penuh (https://.../room/XYZ), extract room ID-nya
+                  const val = e.target.value.trim();
+                  const match = val.match(/\/room\/([^/?#]+)/);
+                  setRoomInput(match ? match[1] : val);
+                  setError("");
+                }}
                 onKeyDown={e => e.key === "Enter" && handleJoin()}
                 className="w-full bg-obsidian-2 border border-card-border rounded-xl px-4 py-3 text-cream placeholder-ash/50
-                           font-display tracking-widest text-center text-xl
+                           font-mono text-center
                            focus:outline-none focus:border-gold focus:shadow-[0_0_0_2px_rgba(255,181,71,0.2)]
                            transition-all duration-200 mb-4"
               />
@@ -133,20 +155,21 @@ export default function HomePage() {
                 >
                   ✅ Join Sekarang
                 </button>
-                <button
-                  onClick={() => { setMode("home"); setError(""); }}
-                  className="w-full py-3 rounded-xl font-display text-base tracking-wide
-                             border border-card-border text-ash hover:border-ash-light hover:text-ash-light
-                             transition-all duration-200"
-                >
-                  ← Kembali
-                </button>
+                {!pendingRoomId && (
+                  <button
+                    onClick={() => { setMode("home"); setError(""); }}
+                    className="w-full py-3 rounded-xl font-display text-base tracking-wide
+                               border border-card-border text-ash hover:border-ash-light hover:text-ash-light
+                               transition-all duration-200"
+                  >
+                    ← Kembali
+                  </button>
+                )}
               </>
             )}
           </div>
         </div>
 
-        {/* Card legend hints */}
         <div className="flex gap-3 text-xs text-ash text-center opacity-60">
           <span>🌋 Jangan draw Lava Cat</span>
           <span>•</span>

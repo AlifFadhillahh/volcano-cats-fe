@@ -113,6 +113,8 @@ export function useColyseusRoom(username: string) {
             addNotification("Username sudah dipakai di room ini. Coba username lain.", "error", "👥");
           } else if (code === 4000) {
             addNotification("Room sudah mulai bermain, tidak bisa join sekarang.", "error", "🔒");
+          } else if (code === 4002) {
+            addNotification("Kamu telah di-kick dari room oleh host.", "warning", "🚫");
           } else {
             addNotification("Koneksi terputus dari server.", "error", "📡");
           }

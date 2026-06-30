@@ -36,33 +36,58 @@ export function CardPlayAnimation({ lastDiscardedCard, playerName }: CardPlayAni
   const [anim, setAnim] = useState<AnimationState | null>(null);
   const lastCardIdRef = useRef<string | null>(null);
   const keyCounterRef = useRef(0);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!lastDiscardedCard) return;
-    if (lastDiscardedCard.id === lastCardIdRef.current) return; // kartu sama, jangan re-trigger
+    if (lastDiscardedCard.id === lastCardIdRef.current) return;
+
+    // Clear timeout lama sebelum set yang baru — supaya tidak ada dua timer
+    // berjalan sekaligus yang bisa bikin animasi menghilang prematur atau
+    // muncul dobel.
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
     lastCardIdRef.current = lastDiscardedCard.id;
     keyCounterRef.current += 1;
-    setAnim({ card: lastDiscardedCard, key: keyCounterRef.current, playerName });
 
-    const timeout = setTimeout(() => setAnim(null), 1400);
-    return () => clearTimeout(timeout);
-  }, [lastDiscardedCard, playerName]);
+    // Capture playerName saat trigger, bukan dari closure yang bisa stale
+    const capturedPlayerName = playerName;
+    setAnim({ card: lastDiscardedCard, key: keyCounterRef.current, playerName: capturedPlayerName });
+
+    timeoutRef.current = setTimeout(() => {
+      setAnim(null);
+      timeoutRef.current = null;
+    }, 1600);
+  // Sengaja tidak include playerName di deps — kita hanya trigger
+  // animasi baru saat KARTU berubah, bukan saat nama pemain berubah
+  // (perubahan nama bisa terjadi dari state update yang tidak relevan).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastDiscardedCard?.id]);
+
+  // Cleanup saat unmount
+  useEffect(() => {
+    return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
+  }, []);
 
   if (!anim) return null;
 
   const meta = CARD_META[anim.card.type as CardType];
   const theme = getCardTheme(anim.card.type as CardType);
 
+  // PENTING: key harus di-pass ke elemen yang punya animasi CSS,
+  // bukan ke container parent. Kalau key di parent, React unmount
+  // seluruh subtree lalu remount — yang bikin flickering. Kalau key
+  // di elemen animasi itu sendiri, hanya elemen itu yang di-reset.
   return (
-    <div
-      key={anim.key}
-      className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none"
-    >
-      {/* Dim backdrop singkat */}
-      <div className="absolute inset-0 bg-black/30 animate-[fadeOut_1.4s_ease-out_forwards]" />
-
-      <div className="relative flex flex-col items-center gap-3 animate-[cardPlayPop_1.4s_ease-out_forwards]">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center pointer-events-none">
+      <div
+        key={`bg-${anim.key}`}
+        className="absolute inset-0 bg-black/30 animate-[fadeOut_1.4s_ease-out_forwards]"
+      />
+      <div
+        key={`card-${anim.key}`}
+        className="relative flex flex-col items-center gap-3 animate-[cardPlayPop_1.4s_ease-out_forwards]"
+      >
         <div
           className={clsx(
             "w-32 h-48 rounded-2xl flex flex-col items-center justify-center gap-2 border-2 shadow-2xl",

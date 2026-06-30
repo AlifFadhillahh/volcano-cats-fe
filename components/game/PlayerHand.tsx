@@ -12,11 +12,10 @@ interface PlayerHandProps {
   onPlayCard: (cardId: string, needsTarget: boolean) => void;
   onPlayGang: (cardIds: string[], needsTarget: boolean) => void;
   hasPendingAction: boolean;
+  hasBunker?: boolean;
 }
 
-// Urutan tampil grup kartu di tangan — gang cards dulu (paling sering dikombinasikan),
-// lalu kartu aksi umum, lalu kartu spesial. Water Bucket & Lava Cat tidak pernah
-// dimainkan manual jadi taruh paling akhir / tetap tampil tapi disabled.
+// ── GROUP ORDER ─────────────────────────────────────────────
 const GROUP_ORDER: CardType[] = [
   ...GANG_TYPES,
   "FREEZE", "NAP_TIME", "ERUPTION", "REVERSE", "EARTHQUAKE", "SPY_CAT",
@@ -25,10 +24,7 @@ const GROUP_ORDER: CardType[] = [
   "WATER_BUCKET", "LAVA_CAT",
 ];
 
-interface CardGroup {
-  type: CardType;
-  cards: Card[];
-}
+interface CardGroup { type: CardType; cards: Card[]; }
 
 function groupHand(hand: Card[]): CardGroup[] {
   const map = new Map<CardType, Card[]>();
@@ -37,24 +33,15 @@ function groupHand(hand: Card[]): CardGroup[] {
     list.push(card);
     map.set(card.type as CardType, list);
   }
-  // Urutkan sesuai GROUP_ORDER, tapi tetap tampilkan tipe yang tidak ada di
-  // daftar (jaga-jaga ada tipe baru di masa depan) di akhir.
   const ordered: CardGroup[] = [];
   for (const type of GROUP_ORDER) {
     const cards = map.get(type);
-    if (cards && cards.length > 0) {
-      ordered.push({ type, cards });
-      map.delete(type);
-    }
+    if (cards?.length) { ordered.push({ type, cards }); map.delete(type); }
   }
-  for (const [type, cards] of map) {
-    ordered.push({ type, cards });
-  }
+  for (const [type, cards] of map) ordered.push({ type, cards });
   return ordered;
 }
 
-// Untuk satu grup gang card dengan N kartu sejenis, tentukan kombinasi tercepat
-// yang bisa langsung "auto-play" tanpa perlu select manual satu-satu.
 function getQuickGangAction(count: number): { playCount: number; label: string; needsTarget: boolean } | null {
   if (count >= 4) return { playCount: 4, label: "🔥 Quad", needsTarget: false };
   if (count === 3) return { playCount: 3, label: "🎯 Triple", needsTarget: true };
@@ -62,75 +49,50 @@ function getQuickGangAction(count: number): { playCount: number; label: string; 
   return null;
 }
 
-export function PlayerHand({ hand, isMyTurn, onPlayCard, onPlayGang, hasPendingAction }: PlayerHandProps) {
+export function PlayerHand({ hand, isMyTurn, onPlayCard, onPlayGang, hasPendingAction, hasBunker }: PlayerHandProps) {
   const { selectedCards, toggleCardSelection, clearSelection } = useGameStore();
   const [hoveredCard, setHoveredCard] = useState<Card | null>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   const groups = useMemo(() => groupHand(hand), [hand]);
 
-  // Rainbow check: 5 gang card dengan 5 tipe berbeda, dihitung lintas grup
   const rainbowAvailable = useMemo(() => {
-    const gangTypesInHand = new Set(
-      hand.filter(c => isGangCard(c.type)).map(c => c.type)
-    );
-    return gangTypesInHand.size === 5;
+    const types = new Set(hand.filter(c => isGangCard(c.type)).map(c => c.type));
+    return types.size === 5;
   }, [hand]);
 
-  function pickOneCardPerType(types: CardType[]): string[] {
-    const ids: string[] = [];
-    for (const type of types) {
-      const card = hand.find(c => c.type === type && !ids.includes(c.id));
-      if (card) ids.push(card.id);
-    }
-    return ids;
-  }
-
-  // Detect valid gang combos from MANUAL selection (tetap didukung untuk fleksibilitas,
-  // misal user mau triple tapi dari 4 kartu yang dipunya — pilih manual 3 dari 4)
   const gangValidation = useMemo(() => {
     if (selectedCards.length < 2) return { valid: false, reason: "", needsTarget: false };
-    const selectedCardObjs = hand.filter(c => selectedCards.includes(c.id));
-    const allGang = selectedCardObjs.every(c => isGangCard(c.type));
-    if (!allGang) return { valid: false, reason: "Hanya gang card yang bisa dikombinasi", needsTarget: false };
-
-    const types = new Set(selectedCardObjs.map(c => c.type));
-    if (selectedCardObjs.length === 5 && types.size === 5) {
-      return { valid: true, reason: "🌈 Rainbow Gang — Full Riot! Swap tangan!", needsTarget: true };
+    const sel = hand.filter(c => selectedCards.includes(c.id));
+    if (!sel.every(c => isGangCard(c.type))) {
+      return { valid: false, reason: "Hanya gang card yang bisa dikombinasi", needsTarget: false };
     }
-    if (types.size === 1 && [2, 3, 4].includes(selectedCardObjs.length)) {
+    const types = new Set(sel.map(c => c.type));
+    if (sel.length === 5 && types.size === 5)
+      return { valid: true, reason: "🌈 Rainbow — Swap tangan!", needsTarget: true };
+    if (types.size === 1 && [2,3,4].includes(sel.length)) {
       const labels: Record<number, { text: string; needsTarget: boolean }> = {
         2: { text: "👥 Pair — Steal random!", needsTarget: true },
-        3: { text: "🎯 Triple — Steal random dari target!", needsTarget: true },
+        3: { text: "🎯 Triple — Steal dari target!", needsTarget: true },
         4: { text: "🔥 Quad — Steal dari semua!", needsTarget: false },
       };
-      const l = labels[selectedCardObjs.length];
+      const l = labels[sel.length];
       return { valid: true, reason: l.text, needsTarget: l.needsTarget };
     }
-    return { valid: false, reason: "Kombinasi kartu tidak valid", needsTarget: false };
+    return { valid: false, reason: "Kombinasi tidak valid", needsTarget: false };
   }, [selectedCards, hand]);
 
   function handleCardClick(card: Card) {
     if (!isMyTurn || hasPendingAction) return;
-
-    if (isGangCard(card.type)) {
-      toggleCardSelection(card.id);
-      return;
-    }
-
+    if (isGangCard(card.type)) { toggleCardSelection(card.id); return; }
     if (selectedCards.length > 0) clearSelection();
-
-    const needsTarget = NEEDS_TARGET.includes(card.type as CardType);
-    onPlayCard(card.id, needsTarget);
+    onPlayCard(card.id, NEEDS_TARGET.includes(card.type as CardType));
   }
 
   function handlePlayGangClick() {
-    if (gangValidation.valid) {
-      onPlayGang(selectedCards, gangValidation.needsTarget);
-      clearSelection();
-    }
+    if (gangValidation.valid) { onPlayGang(selectedCards, gangValidation.needsTarget); clearSelection(); }
   }
 
-  // Quick-play: langsung mainkan N kartu pertama dari grup tanpa perlu select manual.
   function handleQuickGang(type: CardType, count: number, needsTarget: boolean) {
     if (!isMyTurn || hasPendingAction) return;
     const ids = hand.filter(c => c.type === type).slice(0, count).map(c => c.id);
@@ -140,78 +102,98 @@ export function PlayerHand({ hand, isMyTurn, onPlayCard, onPlayGang, hasPendingA
 
   function handleQuickRainbow() {
     if (!isMyTurn || hasPendingAction) return;
-    const ids = pickOneCardPerType(GANG_TYPES);
-    if (ids.length === 5) {
-      clearSelection();
-      onPlayGang(ids, true);
+    const ids: string[] = [];
+    for (const t of GANG_TYPES) {
+      const c = hand.find(card => card.type === t && !ids.includes(card.id));
+      if (c) ids.push(c.id);
     }
+    if (ids.length === 5) { clearSelection(); onPlayGang(ids, true); }
   }
 
   const canInteract = isMyTurn && !hasPendingAction;
+  const totalCards = hand.length;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-30">
-      {/* Gang action bar — manual selection */}
-      {selectedCards.length >= 2 && (
-        <div className="flex justify-center mb-2 animate-slide-up px-4">
-          <div className={clsx(
-            "flex items-center gap-3 px-4 py-2 rounded-xl border shadow-xl",
-            gangValidation.valid ? "bg-gold/15 border-gold" : "bg-ember/10 border-ember/50"
-          )}>
-            <span className={clsx("text-sm font-display", gangValidation.valid ? "text-gold" : "text-ember")}>
-              {gangValidation.reason || `${selectedCards.length} kartu dipilih`}
-            </span>
-            {gangValidation.valid && (
-              <button
-                onClick={handlePlayGangClick}
-                className="px-3 py-1 bg-gold text-obsidian rounded-lg text-xs font-display hover:bg-gold/90 transition-colors"
-              >
-                Mainkan
-              </button>
+    <div
+      className="fixed bottom-0 left-0 right-0 z-30"
+      onMouseMove={e => setMousePos({ x: e.clientX, y: e.clientY })}
+      onMouseLeave={() => setHoveredCard(null)}
+    >
+      {/* ── YOUR HAND PANEL ─────────────────────────────── */}
+      <div className="bg-[#0d1117] border-t border-[#1e2530]" style={{ minHeight: 164 }}>
+
+        {/* Panel header — ala referensi */}
+        <div className="flex items-center justify-between px-4 pt-2.5 pb-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono text-[#4a5568] uppercase tracking-[0.15em]">YOUR HAND</span>
+            {hasBunker && (
+              <span className="text-[10px] bg-[#1a2535] border border-[#2a3a55] rounded-full px-2 py-0.5 font-mono text-blue-300">
+                🛡️ Bunker
+              </span>
             )}
-            <button onClick={clearSelection} className="text-ash hover:text-cream text-xs">✕</button>
           </div>
+          <span className="text-[10px] font-mono text-[#4a5568]">
+            {totalCards} card{totalCards !== 1 ? "s" : ""}
+          </span>
         </div>
-      )}
 
-      {/* Rainbow quick action — selalu muncul kalau kondisi terpenuhi, lintas grup */}
-      {rainbowAvailable && selectedCards.length === 0 && canInteract && (
-        <div className="flex justify-center mb-2 animate-slide-up px-4">
-          <button
-            onClick={handleQuickRainbow}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-gold bg-gold/10
-                       text-gold text-sm font-display hover:bg-gold/20 transition-colors animate-glow-pulse"
-          >
-            🌈 Full Riot Tersedia — Mainkan Rainbow Gang!
-          </button>
-        </div>
-      )}
+        {/* Action bars */}
+        {selectedCards.length >= 2 && (
+          <div className="flex justify-center pb-1 px-4">
+            <div className={clsx(
+              "flex items-center gap-3 px-3 py-1.5 rounded-lg border text-xs",
+              gangValidation.valid
+                ? "bg-gold/10 border-gold/40 text-gold"
+                : "bg-red-900/20 border-red-800/40 text-red-400"
+            )}>
+              <span className="font-display">{gangValidation.reason || `${selectedCards.length} dipilih`}</span>
+              {gangValidation.valid && (
+                <button onClick={handlePlayGangClick}
+                  className="bg-gold text-obsidian px-2.5 py-0.5 rounded font-display text-[10px] hover:bg-gold/90">
+                  Play
+                </button>
+              )}
+              <button onClick={clearSelection} className="text-current opacity-60 hover:opacity-100">✕</button>
+            </div>
+          </div>
+        )}
 
-      {/* Hand cards — grouped by type, horizontal scroll (fixed height, tidak pernah menutupi area lain) */}
-      <div className="bg-gradient-to-t from-obsidian via-obsidian/95 to-transparent pt-6 pb-4">
+        {rainbowAvailable && selectedCards.length === 0 && canInteract && (
+          <div className="flex justify-center pb-1 px-4">
+            <button onClick={handleQuickRainbow}
+              className="text-[11px] font-display text-gold border border-gold/40 bg-gold/10 rounded-full px-3 py-1 animate-glow-pulse">
+              🌈 Rainbow Gang tersedia!
+            </button>
+          </div>
+        )}
+
+        {/* ── CARDS SCROLL AREA ─────────────────────────── */}
         {hand.length === 0 ? (
-          <p className="text-ash text-sm py-8 text-center">Tidak ada kartu di tangan</p>
+          <p className="text-[#4a5568] text-xs text-center py-6 font-mono">No cards</p>
         ) : (
-          <div className="overflow-x-auto overflow-y-visible px-4 pb-1 max-w-full">
-            <div className="flex items-end gap-1 w-max mx-auto min-w-full justify-center">
+          <div
+            className="overflow-x-auto px-4 pb-3"
+            style={{ overflowY: "visible", paddingTop: 12 }}
+          >
+            <div className="flex items-end gap-0.5 w-max mx-auto min-w-full justify-center">
               {groups.map((group, groupIdx) => {
                 const isGang = isGangCard(group.type);
                 const quickAction = isGang ? getQuickGangAction(group.cards.length) : null;
 
                 return (
                   <div key={group.type} className="flex items-end gap-0.5 relative">
-                    {/* Separator antar grup (kecuali grup pertama) */}
                     {groupIdx > 0 && (
-                      <div className="self-stretch w-px bg-card-border/50 mx-1.5 my-2" />
+                      <div className="self-stretch w-px bg-[#1e2530] mx-2 my-1" />
                     )}
 
-                    {/* Quick-play badge di atas grup gang card yang punya kombinasi valid */}
+                    {/* Quick gang badge */}
                     {quickAction && canInteract && (
                       <button
                         onClick={() => handleQuickGang(group.type, quickAction.playCount, quickAction.needsTarget)}
-                        className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap
-                                   px-2 py-0.5 rounded-full bg-gold/90 text-obsidian text-[10px] font-display
-                                   hover:bg-gold transition-colors shadow-md z-20"
+                        className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap
+                                   px-1.5 py-0.5 rounded text-[9px] font-mono
+                                   bg-[#1e2d1a] border border-green-800/60 text-green-400
+                                   hover:bg-[#243520] transition-colors z-20"
                       >
                         {quickAction.label}
                       </button>
@@ -220,11 +202,11 @@ export function PlayerHand({ hand, isMyTurn, onPlayCard, onPlayGang, hasPendingA
                     {group.cards.map((card, i) => (
                       <div
                         key={card.id}
-                        className="animate-card-deal flex-shrink-0"
+                        className="animate-card-deal flex-shrink-0 relative"
                         style={{
                           animationDelay: `${(groupIdx * 3 + i) * 0.03}s`,
-                          marginLeft: i > 0 ? "-28px" : "0",
-                          zIndex: selectedCards.includes(card.id) ? 50 : i,
+                          marginLeft: i > 0 ? "-30px" : "0",
+                          zIndex: selectedCards.includes(card.id) ? 50 : hoveredCard?.id === card.id ? 40 : i,
                         }}
                       >
                         <GameCard
@@ -244,20 +226,23 @@ export function PlayerHand({ hand, isMyTurn, onPlayCard, onPlayGang, hasPendingA
         )}
       </div>
 
-      {/* Tooltip kartu — di-lift ke level PlayerHand (fixed position, BUKAN
-          absolute relatif ke kartu) supaya tidak ke-clip oleh overflow-x-auto
-          pada area scroll hand. Muncul di atas area hand, mengikuti kartu mana
-          yang sedang di-hover lewat onHoverChange dari GameCard. */}
-      {hoveredCard && (
-        <div className="fixed bottom-[180px] left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-slide-up">
+      {/* ── TOOLTIP — fixed, tidak kena clip ─────────────── */}
+      {hoveredCard && mousePos.x > 0 && (
+        <div
+          className="fixed z-[100] pointer-events-none"
+          style={{
+            left: `clamp(8px, ${mousePos.x - 104}px, calc(100vw - 224px))`,
+            top: `clamp(8px, ${mousePos.y - 210}px, calc(100vh - 180px))`,
+          }}
+        >
           <div
-            className="bg-obsidian-3 border rounded-lg px-4 py-2.5 text-xs text-cream w-52 text-center shadow-2xl"
-            style={{ borderColor: CARD_META[hoveredCard.type as CardType].color + "88" }}
+            className="bg-[#0d1117]/95 backdrop-blur-sm border rounded-xl px-4 py-3 w-52 shadow-2xl animate-slide-up"
+            style={{ borderColor: CARD_META[hoveredCard.type as CardType].color + "99" }}
           >
-            <p className="font-display text-sm mb-1" style={{ color: CARD_META[hoveredCard.type as CardType].color }}>
+            <p className="font-display text-sm mb-1.5" style={{ color: CARD_META[hoveredCard.type as CardType].color }}>
               {getCardTheme(hoveredCard.type as CardType).displayName}
             </p>
-            <p className="text-ash leading-relaxed">
+            <p className="text-[#8892a4] text-[11px] leading-relaxed">
               {getCardTheme(hoveredCard.type as CardType).displayDescription}
             </p>
           </div>

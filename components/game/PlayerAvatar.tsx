@@ -58,9 +58,14 @@ export function PlayerAvatar({ player, isCurrentTurn, isMe, isDying, onClick, ta
         >
           {player.isAlive ? initials : "💀"}
 
-          {/* Bunker shield */}
+          {/* Bunker shield — lebih prominent, ada tooltip */}
           {player.hasBunker && (
-            <div className="absolute -top-1 -right-1 text-sm">🛡️</div>
+            <div
+              className="absolute -top-2 -right-2 text-base animate-bounce-in"
+              title="Bunker aktif — melindungi dari Lava Cat berikutnya"
+            >
+              🛡️
+            </div>
           )}
 
           {/* Locked indicator */}
@@ -92,7 +97,13 @@ export function PlayerAvatar({ player, isCurrentTurn, isMe, isDying, onClick, ta
         {/* Card count + status */}
         {player.isAlive && (
           <p className="text-ash text-[10px]">
-            {!player.connected ? "Offline · auto-play" : player.away ? "Away · auto-play" : `${player.handCount} kartu`}
+            {!player.connected
+              ? "Offline · auto-play"
+              : player.away
+              ? "Away · auto-play"
+              : player.hasBunker
+              ? "🛡️ Bunker"
+              : `${player.handCount} kartu`}
           </p>
         )}
       </div>

@@ -18,12 +18,14 @@ import { GangPlayerPicker } from "@/components/game/GangPlayerPicker";
 import { TargetingBanner } from "@/components/game/TargetingBanner";
 import { CardPlayAnimation } from "@/components/game/CardPlayAnimation";
 import { EmberParticles } from "@/components/animations/EmberParticles";
+import { RulesModal } from "@/components/game/RulesModal";
 
 export default function RoomPage() {
   const params = useParams();
   const router = useRouter();
   const urlRoomId = params.id as string;
   const isCreating = urlRoomId === "_new";
+  const [showRules, setShowRules] = useState(false);
 
   const {
     username,
@@ -53,15 +55,22 @@ export default function RoomPage() {
   // Connect on mount
   useEffect(() => {
     if (!username) {
+      // User buka link room tapi belum punya username (tab baru atau belum pernah main).
+      // Simpan roomId yang ingin di-join ke localStorage sebagai "pending join",
+      // lalu redirect ke home untuk input username. Halaman home akan detect ini
+      // dan pre-fill kode room + langsung masuk mode join.
+      if (!isCreating) {
+        localStorage.setItem("vc_pending_join", urlRoomId);
+      }
       router.push("/");
       return;
     }
     if (!connectAttempted) {
       setConnectAttempted(true);
       if (isCreating) {
-        connect(); // create new room — Colyseus generate roomId sendiri
+        connect();
       } else {
-        connect(urlRoomId); // join existing room pakai roomId asli dari Colyseus
+        connect(urlRoomId);
       }
     }
   }, [username, connectAttempted, isCreating, urlRoomId, connect, router]);
@@ -91,6 +100,10 @@ export default function RoomPage() {
   // ============================================================
   const handleStartGame = useCallback(
     () => sendMessage("START_GAME"),
+    [sendMessage],
+  );
+  const handleKick = useCallback(
+    (targetSessionId: string) => sendMessage("KICK_PLAYER", { targetSessionId }),
     [sendMessage],
   );
   const handleDrawCard = useCallback(
@@ -184,6 +197,15 @@ export default function RoomPage() {
     router.push("/");
   }, [sendMessage, disconnect, router]);
 
+  // Auto redirect ke home kalau disconnect setelah game (di-kick, atau room bubar)
+  // Delay sedikit supaya notification toast sempat terlihat
+  useEffect(() => {
+    if (connectionStatus === "disconnected" && gameState?.status !== "playing" && gameState?.status !== "finished") {
+      const t = setTimeout(() => router.push("/"), 2000);
+      return () => clearTimeout(t);
+    }
+  }, [connectionStatus, gameState?.status, router]);
+
   // ============================================================
   // LOADING / CONNECTION STATES
   // ============================================================
@@ -239,6 +261,7 @@ export default function RoomPage() {
           gameState={gameState}
           roomId={displayRoomId}
           onStartGame={handleStartGame}
+          onKick={handleKick}
         />
       </>
     );
@@ -314,56 +337,91 @@ export default function RoomPage() {
   })();
 
   return (
-    <div className="min-h-screen bg-table-felt flex flex-col relative overflow-hidden">
-      <EmberParticles count={6} />
+    <div className="min-h-screen bg-[#0a0e14] flex flex-col relative overflow-hidden">
+      <EmberParticles count={4} />
       <NotificationToasts />
 
-      {/* Top bar */}
-      <div className="relative z-20 flex justify-between items-center px-4 py-3">
-        <div className="font-display text-lava text-sm">🌋 {displayRoomId}</div>
-        <div className="flex items-center gap-2">
+      {/* Top bar — ala referensi: logo kiri, room id, buttons kanan */}
+      <div className="relative z-20 flex items-center justify-between px-4 py-2.5 bg-[#0d1117] border-b border-[#1e2530]">
+        {/* Logo + Room */}
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-lava/20 border border-lava/40 flex items-center justify-center text-sm">
+            🌋
+          </div>
+          <div>
+            <p className="font-display text-xs text-[#4a5568] tracking-widest uppercase leading-none">Volcano Cats</p>
+            <p className="font-mono text-cream text-sm leading-tight">Room {displayRoomId}</p>
+          </div>
+        </div>
+
+        {/* Right buttons */}
+        <div className="flex items-center gap-1.5">
+          {/* Connected indicator */}
+          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#1e2530] mr-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            <span className="text-[10px] font-mono text-[#4a5568]">connected</span>
+          </div>
+
           {me?.isAlive && (
             <button
               onClick={handleToggleAway}
               className={clsx(
-                "text-sm px-3 py-1.5 rounded-lg border transition-colors",
+                "text-xs px-3 py-1.5 rounded-lg border font-mono transition-colors",
                 me.away
-                  ? "border-gold bg-gold/10 text-gold"
-                  : "border-card-border text-ash hover:text-cream"
+                  ? "border-gold/60 bg-gold/10 text-gold"
+                  : "border-[#1e2530] text-[#4a5568] hover:text-cream hover:border-[#2e3540]"
               )}
             >
-              {me.away ? "😴 Away" : "💤 Away"}
+              {me.away ? "😴 Away" : "Away"}
             </button>
           )}
           <button
             onClick={toggleLog}
-            className="text-ash hover:text-gold text-sm px-3 py-1.5 rounded-lg border border-card-border transition-colors"
+            className={clsx(
+              "text-xs px-3 py-1.5 rounded-lg border font-mono transition-colors",
+              showLog
+                ? "border-gold/60 bg-gold/10 text-gold"
+                : "border-[#1e2530] text-[#4a5568] hover:text-cream hover:border-[#2e3540]"
+            )}
           >
-            📜 Log
+            Log
+          </button>
+          <button
+            onClick={() => setShowRules(v => !v)}
+            className={clsx(
+              "text-xs px-3 py-1.5 rounded-lg border font-mono transition-colors",
+              showRules
+                ? "border-gold/60 bg-gold/10 text-gold"
+                : "border-[#1e2530] text-[#4a5568] hover:text-cream hover:border-[#2e3540]"
+            )}
+          >
+            Rules
           </button>
           <button
             onClick={handleLeave}
-            className="text-ash hover:text-ember text-sm px-3 py-1.5 rounded-lg border border-card-border hover:border-ember/50 transition-colors"
+            className="text-xs px-3 py-1.5 rounded-lg border border-[#1e2530] text-[#4a5568] hover:text-ember hover:border-ember/40 font-mono transition-colors"
           >
-            🚪 Keluar
+            Leave
           </button>
         </div>
       </div>
 
-      {/* Game table */}
-      <GameTable
-        gameState={gameState}
-        mySessionId={mySessionId}
-        onDrawCard={handleDrawCard}
-        canDraw={canDraw}
-        onSelectTarget={targetingMode ? handleSelectTarget : undefined}
-        targetingMode={targetingMode}
-        isMyTurn={myTurn}
-        amILocked={amILocked}
-        myHandHasFreeze={myHand.some(c => c.type === "FREEZE")}
-        onFreeze={handleFreeze}
-        pendingAction={pendingAction}
-      />
+      {/* Game table — flex-1 mengisi sisa ruang antara top bar dan hand panel */}
+      <div className="flex-1 flex flex-col min-h-0">
+        <GameTable
+          gameState={gameState}
+          mySessionId={mySessionId}
+          onDrawCard={handleDrawCard}
+          canDraw={canDraw}
+          onSelectTarget={targetingMode ? handleSelectTarget : undefined}
+          targetingMode={targetingMode}
+          isMyTurn={myTurn}
+          amILocked={amILocked}
+          myHandHasFreeze={myHand.some(c => c.type === "FREEZE")}
+          onFreeze={handleFreeze}
+          pendingAction={pendingAction}
+        />
+      </div>
 
       {/* Animasi kartu dimainkan — trigger otomatis tiap discard pile berubah */}
       <CardPlayAnimation
@@ -379,6 +437,7 @@ export default function RoomPage() {
           onPlayCard={handlePlayCard}
           onPlayGang={handlePlayGang}
           hasPendingAction={hasPendingAction || targetingMode || showGangPicker || amILocked}
+          hasBunker={me?.hasBunker}
         />
       )}
 
@@ -395,6 +454,9 @@ export default function RoomPage() {
 
       {/* Game log floating panel */}
       <GameLog entries={gameState.log} visible={showLog} onClose={toggleLog} />
+
+      {/* Rules panel */}
+      <RulesModal visible={showRules} onClose={() => setShowRules(false)} />
 
       {/* ============ MODALS ============ */}
       {showPeekSwapModal ? (
